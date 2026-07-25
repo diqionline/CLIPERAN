@@ -17,7 +17,10 @@ import {
   Info,
   Camera,
   LogOut,
-  BookOpen
+  BookOpen,
+  Type,
+  Calendar,
+  RefreshCw
 } from "lucide-react";
 import { VideoClip, TrimRange, AIAnalysis, SubtitleItem, SaaSUser, SystemAuditLog, SystemSettings, CreatedClipHistoryItem } from "./types";
 import { motion, AnimatePresence } from "motion/react";
@@ -32,6 +35,7 @@ import ThumbnailGenerator from "./components/ThumbnailGenerator";
 import SaasDashboard from "./components/SaaSDashboard";
 import LoginView from "./components/LoginView";
 import UserGuide from "./components/UserGuide";
+import StepWorkflowBar from "./components/StepWorkflowBar";
 
 const DEFAULT_USERS: SaaSUser[] = [
   {
@@ -505,7 +509,7 @@ export default function App() {
   const [currentClip, setCurrentClip] = useState<VideoClip | null>(null);
   const [trimRange, setTrimRange] = useState<TrimRange>({ start: 0, end: 10 });
   const [currentTime, setCurrentTime] = useState(0);
-  const [activeTab, setActiveTab] = useState<"ai" | "export" | "thumbnail" | "saas">("ai");
+  const [activeTab, setActiveTab] = useState<"ai" | "subtitles" | "export" | "thumbnail" | "saas">("ai");
   const [activeAnalysis, setActiveAnalysis] = useState<AIAnalysis | null>(null);
 
   // Subtitle states
@@ -518,6 +522,14 @@ export default function App() {
   const [isUrlLoading, setIsUrlLoading] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [toastNotification, setToastNotification] = useState<string | null>(null);
+
+  const triggerToast = (message: string) => {
+    setToastNotification(message);
+    setTimeout(() => {
+      setToastNotification((prev) => (prev === message ? null : prev));
+    }, 4000);
+  };
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -874,6 +886,26 @@ export default function App() {
         ) : (
           /* Normal Tenants Workspace (Budi Free, Siti Pro, Rian Enterprise) */
           <>
+            <input 
+              type="file" 
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept="video/*"
+              className="hidden" 
+            />
+            {/* Interactive Step-by-Step Numbered Workflow Stepper */}
+            <div className="mb-6 animate-fade-in" id="workflow-stepper-container">
+              <StepWorkflowBar
+                currentClip={currentClip}
+                activeAnalysis={activeAnalysis}
+                subtitles={subtitles}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                onResetWorkspace={handleResetWorkspace}
+                onNotification={triggerToast}
+              />
+            </div>
+
             {/* Landing Page State - No Video Imported */}
             {!currentClip ? (
           <div className="flex-1 flex flex-col justify-center py-6 md:py-12 space-y-12 max-w-4xl mx-auto w-full">
@@ -893,7 +925,7 @@ export default function App() {
             </div>
 
             {/* Source Importers (Bento Cards) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="import-cards-container">
               
               {/* Card 1: Local File upload */}
               <div 
@@ -934,13 +966,6 @@ export default function App() {
                   <span>{isDragging ? "Lepas berkas sekarang" : "Pilih berkas video / Seret ke sini"}</span>
                   <Plus className={`w-4 h-4 transform transition-transform ${isDragging ? "rotate-45 text-indigo-400" : "group-hover:rotate-90"}`} />
                 </div>
-                <input 
-                  type="file" 
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  accept="video/*"
-                  className="hidden" 
-                />
               </div>
 
               {/* Card 2: Share Platform Link importer */}
@@ -1219,20 +1244,120 @@ export default function App() {
                   />
                 </div>
 
-                {/* 3. Subtitles & Text Editor */}
-                <div>
-                  <SubtitleEditor
-                    subtitles={subtitles}
-                    setSubtitles={setSubtitles}
-                    showSubtitles={showSubtitles}
-                    setShowSubtitles={setShowSubtitles}
-                    activeSubtitleStyle={activeSubtitleStyle}
-                    setActiveSubtitleStyle={setActiveSubtitleStyle}
-                    currentTime={currentTime}
-                    duration={currentClip.duration}
-                    trimRange={trimRange}
-                    videoRef={videoRef}
-                  />
+                {/* 3. Interactive Step-by-Step Progress & Checkbox Hub */}
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
+                      <h4 className="font-extrabold text-slate-200 text-xs uppercase tracking-wider">📋 Status Alur Kerja Anda</h4>
+                    </div>
+                    <span className="text-[10px] bg-slate-950 px-2.5 py-1 rounded-lg text-indigo-400 font-mono font-bold border border-slate-850">
+                      {Math.round(((subtitles.length > 0 ? 1 : 0) + (activeAnalysis ? 1 : 0) + (activeTab === "export" ? 1 : 0) + 1) / 5 * 100)}% Selesai
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-2.5 text-xs">
+                    <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-850/60 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <span className="w-5 h-5 rounded-full bg-indigo-500/15 text-indigo-400 font-bold flex items-center justify-center text-[10px] border border-indigo-500/30 shrink-0">1</span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-slate-200 text-xs">Langkah 1: Impor Video Baru / Ganti Video</p>
+                          <p className="text-[10px] text-slate-400">Video aktif: <span className="text-slate-300 font-semibold font-mono">"{currentClip.name}"</span></p>
+                        </div>
+                      </div>
+
+                      {/* Compact Quick Importer inside Workspace Area Kerja */}
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-850/50">
+                        {/* 1. File Upload Button */}
+                        <button 
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-lg text-[10px] font-bold text-slate-300 transition-colors"
+                        >
+                          <Upload className="w-3 h-3 text-indigo-400 animate-pulse" />
+                          <span>Unggah MP4</span>
+                        </button>
+
+                        {/* 2. Quick Preset Selector/Reset */}
+                        <button
+                          type="button"
+                          onClick={handleResetWorkspace}
+                          className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-900 hover:bg-slate-850 border border-slate-800 rounded-lg text-[10px] font-bold text-slate-300 transition-colors"
+                        >
+                          <RefreshCw className="w-3 h-3 text-amber-400" />
+                          <span>Ganti / Preset</span>
+                        </button>
+                      </div>
+
+                      {/* 3. Paste YouTube URL Input */}
+                      <form onSubmit={handleUrlSubmit} className="flex gap-1 border-t border-slate-850/50 pt-2">
+                        <input 
+                          type="url"
+                          required
+                          value={videoUrlInput}
+                          onChange={(e) => setVideoUrlInput(e.target.value)}
+                          placeholder="Masukkan tautan YouTube..."
+                          className="flex-1 bg-slate-950 border border-slate-850 focus:border-indigo-500/60 rounded-lg px-2 py-1 text-[9px] focus:outline-none text-slate-300 placeholder-slate-600"
+                        />
+                        <button 
+                          type="submit"
+                          disabled={isUrlLoading}
+                          className="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-[9px] px-2.5 rounded-lg transition-all flex items-center justify-center shrink-0"
+                        >
+                          {isUrlLoading ? "..." : "Konek"}
+                        </button>
+                      </form>
+                      {urlError && <p className="text-[8px] text-red-400 mt-1">{urlError}</p>}
+                    </div>
+                    
+                    <button 
+                      onClick={() => setActiveTab("ai")}
+                      className={`w-full text-left flex items-start gap-3 p-2.5 rounded-xl transition-all border ${activeAnalysis ? 'bg-emerald-950/10 border-emerald-500/20 text-slate-300' : 'bg-slate-950/20 border-slate-850/40 hover:border-slate-800 hover:bg-slate-950/50'}`}
+                    >
+                      <span className={`w-5 h-5 rounded-full font-bold flex items-center justify-center text-[10px] shrink-0 ${activeAnalysis ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}>2</span>
+                      <div className="flex-1">
+                        <p className={`font-semibold ${activeAnalysis ? 'text-emerald-400' : 'text-slate-300 group-hover:text-white'}`}>Langkah 2: Deteksi AI Highlights {activeAnalysis ? "✓" : ""}</p>
+                        <p className="text-[10px] text-slate-500">
+                          {activeAnalysis ? "AI telah memindai. Klik untuk melihat rekomendasi adegan." : "Klik di sini untuk memindai & mendeteksi adegan menarik dengan Gemini AI."}
+                        </p>
+                      </div>
+                    </button>
+
+                    <button 
+                      onClick={() => setActiveTab("subtitles")}
+                      className={`w-full text-left flex items-start gap-3 p-2.5 rounded-xl transition-all border ${subtitles.length > 0 ? 'bg-emerald-950/10 border-emerald-500/20 text-slate-300' : 'bg-slate-950/20 border-slate-850/40 hover:border-slate-800 hover:bg-slate-950/50'}`}
+                    >
+                      <span className={`w-5 h-5 rounded-full font-bold flex items-center justify-center text-[10px] shrink-0 ${subtitles.length > 0 ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}>3</span>
+                      <div className="flex-1">
+                        <p className={`font-semibold ${subtitles.length > 0 ? 'text-emerald-400' : 'text-slate-300'}`}>Langkah 3: Edit Teks Bahasa Indonesia {subtitles.length > 0 ? "✓" : ""}</p>
+                        <p className="text-[10px] text-slate-500">
+                          {subtitles.length > 0 ? `${subtitles.length} baris subtitle aktif. Klik untuk menyunting teks.` : "Klik di sini untuk mengedit subtitle karaoke hasil translasi AI."}
+                        </p>
+                      </div>
+                    </button>
+
+                    <button 
+                      onClick={() => setActiveTab("thumbnail")}
+                      className="w-full text-left flex items-start gap-3 p-2.5 rounded-xl transition-all border bg-slate-950/20 border-slate-850/40 hover:border-slate-800 hover:bg-slate-950/50"
+                    >
+                      <span className="w-5 h-5 rounded-full bg-slate-900 text-slate-400 font-bold flex items-center justify-center text-[10px] border border-slate-800 shrink-0">4</span>
+                      <div className="flex-1">
+                        <p className="font-semibold text-slate-300">Langkah 4: Cover Thumbnail Estetik</p>
+                        <p className="text-[10px] text-slate-500">Tangkap adegan terbaik, berikan judul tebal, lalu simpan cover gambar PNG.</p>
+                      </div>
+                    </button>
+
+                    <button 
+                      onClick={() => setActiveTab("export")}
+                      className="w-full text-left flex items-start gap-3 p-2.5 rounded-xl transition-all border bg-slate-950/20 border-slate-850/40 hover:border-slate-800 hover:bg-slate-950/50"
+                    >
+                      <span className="w-5 h-5 rounded-full bg-slate-900 text-slate-400 font-bold flex items-center justify-center text-[10px] border border-slate-800 shrink-0">5</span>
+                      <div className="flex-1">
+                        <p className="font-semibold text-slate-300">Langkah 5: Ekspor, Bagikan & Jadwal</p>
+                        <p className="text-[10px] text-slate-500">Unduh hasil video Anda atau buat posting terjadwal ke media sosial.</p>
+                      </div>
+                    </button>
+                  </div>
                 </div>
 
               </div>
@@ -1256,8 +1381,46 @@ export default function App() {
                     }}
                     transition={{ duration: 0.2 }}
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>AI Highlights</span>
+                    <Sparkles className="w-3.5 h-3.5 animate-pulse text-indigo-400" />
+                    <span>Langkah 2: AI</span>
+                  </motion.button>
+
+                  <motion.button
+                    onClick={() => setActiveTab("subtitles")}
+                    className={`flex-1 min-w-[70px] py-2.5 px-2 rounded-xl font-bold text-[11px] flex items-center justify-center gap-1.5 ${
+                      activeTab === "subtitles"
+                        ? "bg-slate-850 text-emerald-400 border border-slate-800 shadow-md"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                    id="subtitle-tab-btn"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    animate={{
+                      boxShadow: activeTab === "subtitles" ? "0 0 12px rgba(16, 185, 129, 0.25)" : "0 0 0px rgba(0,0,0,0)"
+                    }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Type className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Langkah 3: Teks</span>
+                  </motion.button>
+
+                  <motion.button
+                    onClick={() => setActiveTab("thumbnail")}
+                    className={`flex-1 min-w-[70px] py-2.5 px-2 rounded-xl font-bold text-[11px] flex items-center justify-center gap-1.5 ${
+                      activeTab === "thumbnail"
+                        ? "bg-slate-850 text-pink-400 border border-slate-800 shadow-md"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                    id="thumbnail-tab-btn"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    animate={{
+                      boxShadow: activeTab === "thumbnail" ? "0 0 12px rgba(244, 114, 182, 0.25)" : "0 0 0px rgba(0,0,0,0)"
+                    }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Camera className="w-3.5 h-3.5 text-pink-400" />
+                    <span>Langkah 4: Cover</span>
                   </motion.button>
 
                   <motion.button
@@ -1275,32 +1438,13 @@ export default function App() {
                     }}
                     transition={{ duration: 0.2 }}
                   >
-                    <Share2 className="w-3.5 h-3.5" />
-                    <span>Ekspor</span>
-                  </motion.button>
-
-                  <motion.button
-                    onClick={() => setActiveTab("thumbnail")}
-                    className={`flex-1 min-w-[70px] py-2.5 px-2 rounded-xl font-bold text-[11px] flex items-center justify-center gap-1.5 ${
-                      activeTab === "thumbnail"
-                        ? "bg-slate-850 text-emerald-400 border border-slate-800 shadow-md"
-                        : "text-slate-400 hover:text-slate-200"
-                    }`}
-                    id="thumbnail-tab-btn"
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    animate={{
-                      boxShadow: activeTab === "thumbnail" ? "0 0 12px rgba(16, 185, 129, 0.25)" : "0 0 0px rgba(0,0,0,0)"
-                    }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>Thumbnail</span>
+                    <Share2 className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Langkah 5: Ekspor</span>
                   </motion.button>
 
                   <motion.button
                     onClick={() => setActiveTab("saas")}
-                    className={`flex-1 min-w-[70px] py-2.5 px-2 rounded-xl font-bold text-[11px] flex items-center justify-center gap-1.5 ${
+                    className={`flex-none py-2.5 px-2.5 rounded-xl font-bold text-[11px] flex items-center justify-center gap-1.5 ${
                       activeTab === "saas"
                         ? "bg-slate-850 text-purple-400 border border-slate-800 shadow-md"
                         : "text-slate-400 hover:text-slate-200"
@@ -1314,12 +1458,11 @@ export default function App() {
                     transition={{ duration: 0.2 }}
                   >
                     <Shield className="w-3.5 h-3.5" />
-                    <span>SaaS & Plan</span>
                   </motion.button>
                 </div>
 
                 {/* Tab Frame Contents */}
-                <div className="flex-1 bg-slate-900 border-x border-b border-slate-800 rounded-b-2xl overflow-hidden min-h-[460px] flex flex-col">
+                <div className="flex-1 bg-slate-900 border-x border-b border-slate-800 rounded-b-2xl overflow-hidden min-h-[500px] flex flex-col">
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={activeTab}
@@ -1337,21 +1480,41 @@ export default function App() {
                           onApplyHighlight={handleApplyAIHighlight}
                           activeAnalysis={activeAnalysis}
                           setActiveAnalysis={setActiveAnalysis}
+                          setActiveTab={setActiveTab}
                         />
+                      ) : activeTab === "subtitles" ? (
+                        <div id="subtitle-editor-panel-card" className="flex-1 flex flex-col">
+                          <SubtitleEditor
+                            subtitles={subtitles}
+                            setSubtitles={setSubtitles}
+                            showSubtitles={showSubtitles}
+                            setShowSubtitles={setShowSubtitles}
+                            activeSubtitleStyle={activeSubtitleStyle}
+                            setActiveSubtitleStyle={setActiveSubtitleStyle}
+                            currentTime={currentTime}
+                            duration={currentClip.duration}
+                            trimRange={trimRange}
+                            videoRef={videoRef}
+                          />
+                        </div>
                       ) : activeTab === "export" ? (
-                        <SocialShareModal
-                          trimRange={trimRange}
-                          currentClip={currentClip}
-                          analysis={activeAnalysis}
-                          onAddCreatedClip={handleAddCreatedClip}
-                        />
+                        <div id="export-share-card" className="flex-1 flex flex-col">
+                          <SocialShareModal
+                            trimRange={trimRange}
+                            currentClip={currentClip}
+                            analysis={activeAnalysis}
+                            onAddCreatedClip={handleAddCreatedClip}
+                          />
+                        </div>
                       ) : activeTab === "thumbnail" ? (
-                        <ThumbnailGenerator
-                          videoRef={videoRef}
-                          currentTime={currentTime}
-                          currentClip={currentClip}
-                          trimRange={trimRange}
-                        />
+                        <div id="thumbnail-generator-card" className="flex-1 flex flex-col">
+                          <ThumbnailGenerator
+                            videoRef={videoRef}
+                            currentTime={currentTime}
+                            currentClip={currentClip}
+                            trimRange={trimRange}
+                          />
+                        </div>
                       ) : (
                         <SaasDashboard
                           currentUser={currentUser}
@@ -1447,6 +1610,23 @@ export default function App() {
       )}
 
       <UserGuide isOpen={isUserGuideOpen} onClose={() => setIsUserGuideOpen(false)} />
+
+      {/* Interactive Toast Alerts */}
+      <AnimatePresence>
+        {toastNotification && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-indigo-500/30 text-indigo-200 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 max-w-sm"
+          >
+            <div className="w-6 h-6 rounded-lg bg-indigo-500/10 flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse" />
+            </div>
+            <p className="text-xs font-bold leading-relaxed">{toastNotification}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

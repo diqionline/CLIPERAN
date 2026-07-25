@@ -66,18 +66,44 @@ export async function captureVideoKeyframes(
       // Request seek
       videoElement.currentTime = targetTime;
       
-      // Wait for seeked event
+      // Wait for seeked event with a safety timeout of 400ms to prevent hanging!
       await new Promise<void>((resolve) => {
+        let resolved = false;
+        const timeout = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            videoElement.removeEventListener("seeked", onSeeked);
+            resolve();
+          }
+        }, 400);
+
         const onSeeked = () => {
-          videoElement.removeEventListener("seeked", onSeeked);
-          resolve();
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            videoElement.removeEventListener("seeked", onSeeked);
+            resolve();
+          }
         };
         videoElement.addEventListener("seeked", onSeeked);
       });
 
-      // Draw current video frame to canvas
-      ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-      const base64 = canvas.toDataURL("image/jpeg", 0.7); // 70% quality compression
+      let base64 = "";
+      try {
+        // Draw current video frame to canvas
+        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+        base64 = canvas.toDataURL("image/jpeg", 0.7); // 70% quality compression
+      } catch (error) {
+        console.warn("CORS/SecurityError when exporting frame base64. Using gradient fallback frame.", error);
+        // Generate a beautiful colorful fallback gradient with timestamp
+        ctx.fillStyle = `hsl(${(i * 72) % 360}, 65%, 45%)`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 16px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(`Frame ${i + 1} (${targetTime.toFixed(1)}s)`, canvas.width / 2, canvas.height / 2);
+        base64 = canvas.toDataURL("image/jpeg", 0.7);
+      }
       
       frames.push({
         base64,

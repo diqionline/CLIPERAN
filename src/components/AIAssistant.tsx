@@ -8,10 +8,14 @@ import {
   AlertCircle,
   Clock,
   ArrowRight,
-  FileText
+  FileText,
+  Play,
+  Copy,
+  Camera,
+  Scissors
 } from "lucide-react";
 import { captureVideoKeyframes } from "../utils";
-import { AIAnalysis, VideoClip } from "../types";
+import { AIAnalysis, VideoClip, AIScene } from "../types";
 
 interface AIAssistantProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -20,6 +24,7 @@ interface AIAssistantProps {
   onApplyHighlight: (start: number, end: number, analysis: AIAnalysis) => void;
   activeAnalysis: AIAnalysis | null;
   setActiveAnalysis: React.Dispatch<React.SetStateAction<AIAnalysis | null>>;
+  setActiveTab?: (tab: "ai" | "export" | "thumbnail" | "saas") => void;
 }
 
 export default function AIAssistant({
@@ -29,11 +34,14 @@ export default function AIAssistant({
   onApplyHighlight,
   activeAnalysis,
   setActiveAnalysis,
+  setActiveTab,
 }: AIAssistantProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [notification, setNotification] = useState<string | null>(null);
+  const [selectedSceneId, setSelectedSceneId] = useState<string>("scene-1");
 
   // States for Categories
   const [categories, setCategories] = useState<string[]>([
@@ -123,6 +131,7 @@ export default function AIAssistant({
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       setActiveAnalysis(data);
+      setSelectedSceneId("scene-1"); // reset to primary
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Terjadi kesalahan saat menganalisis video dengan AI.");
@@ -135,6 +144,63 @@ export default function AIAssistant({
     if (score >= 90) return "text-emerald-400 border-emerald-500/30 bg-emerald-950/20";
     if (score >= 75) return "text-amber-400 border-amber-500/30 bg-amber-950/20";
     return "text-slate-400 border-slate-700 bg-slate-800/55";
+  };
+
+  // Switch/Apply selected scene to main timeline editor & seek video playhead
+  const handleApplyScene = (scene: AIScene | { start: number, end: number, title: string, reason: string, viralScore: number, suggestedCaption: string, subtitles?: any[] }) => {
+    // Call parent handler to apply highlight and update state
+    onApplyHighlight(scene.start, scene.end, {
+      recommendedStart: scene.start,
+      recommendedEnd: scene.end,
+      title: scene.title,
+      reason: scene.reason,
+      viralScore: scene.viralScore,
+      suggestedCaption: scene.suggestedCaption,
+      subtitles: scene.subtitles || [],
+      isMock: activeAnalysis?.isMock || false,
+      scenes: activeAnalysis?.scenes
+    });
+
+    // Seek player
+    if (videoRef.current) {
+      videoRef.current.currentTime = scene.start;
+      videoRef.current.play().catch(() => {});
+    }
+
+    setNotification(`Adegan "${scene.title}" berhasil diterapkan ke editor!`);
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  // Apply scene then switch to Thumbnail Creator tab
+  const handleCreateThumbnailFromScene = (scene: AIScene | { start: number, end: number, title: string, reason: string, viralScore: number, suggestedCaption: string, subtitles?: any[] }) => {
+    // Apply highlight
+    onApplyHighlight(scene.start, scene.end, {
+      recommendedStart: scene.start,
+      recommendedEnd: scene.end,
+      title: scene.title,
+      reason: scene.reason,
+      viralScore: scene.viralScore,
+      suggestedCaption: scene.suggestedCaption,
+      subtitles: scene.subtitles || [],
+      isMock: activeAnalysis?.isMock || false,
+      scenes: activeAnalysis?.scenes
+    });
+
+    // Seek player to start of scene for thumbnail capture
+    if (videoRef.current) {
+      videoRef.current.currentTime = scene.start;
+      videoRef.current.pause();
+    }
+
+    if (setActiveTab) {
+      setActiveTab("thumbnail");
+    }
+  };
+
+  const handleCopyCaption = (caption: string) => {
+    navigator.clipboard.writeText(caption);
+    setNotification("Caption & hashtag disalin ke clipboard! 📋");
+    setTimeout(() => setNotification(null), 3000);
   };
 
   return (
@@ -151,6 +217,14 @@ export default function AIAssistant({
           </div>
         </div>
       </div>
+
+      {/* Dynamic Success Notifications inside panel */}
+      {notification && (
+        <div className="bg-emerald-950/75 border border-emerald-500/30 text-emerald-300 rounded-xl py-2.5 px-3.5 text-xs flex items-center gap-2 animate-fade-in shadow-md">
+          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="font-medium">{notification}</span>
+        </div>
+      )}
 
       {/* Main State Handling */}
       {!isAnalyzing && !activeAnalysis && (
@@ -296,42 +370,40 @@ export default function AIAssistant({
 
       {/* AI Analysis Result Screen */}
       {activeAnalysis && !isAnalyzing && (
-        <div className="flex-1 overflow-y-auto space-y-5 pr-1 max-h-[480px]" id="ai-result-screen">
-          {/* Headline Recommendation Card */}
-          <div className="bg-slate-850 border border-slate-800 rounded-xl p-4 space-y-3.5">
+        <div className="flex-1 overflow-y-auto space-y-5 pr-1 max-h-[520px]" id="ai-result-screen">
+          
+          {/* Main Top Recommendation Card */}
+          <div className="bg-slate-850 border border-slate-800 rounded-xl p-4 space-y-3">
             <div className="flex items-start justify-between gap-2">
               <div className="space-y-1">
-                <span className="text-[10px] uppercase font-bold tracking-widest text-indigo-400 bg-indigo-950/80 border border-indigo-500/20 py-0.5 px-2 rounded-full">Rekomendasi Terbaik</span>
-                <h4 className="font-semibold text-slate-200 text-sm">{activeAnalysis.title}</h4>
+                <span className="text-[9px] uppercase font-bold tracking-widest text-indigo-400 bg-indigo-950/80 border border-indigo-500/20 py-0.5 px-2.5 rounded-full">Sorotan Utama</span>
+                <h4 className="font-bold text-slate-200 text-xs sm:text-sm">{activeAnalysis.title}</h4>
               </div>
-              <div className={`flex items-center gap-1.5 px-2.5 py-1.5 border rounded-lg ${getScoreColor(activeAnalysis.viralScore)}`}>
-                <Flame className="w-4 h-4 fill-current" />
-                <div className="text-center">
-                  <div className="text-xs font-bold leading-none">{activeAnalysis.viralScore}%</div>
-                  <div className="text-[8px] font-medium uppercase tracking-wider text-slate-400">Viral</div>
-                </div>
+              <div className={`flex items-center gap-1 px-2 py-1 border rounded-lg ${getScoreColor(activeAnalysis.viralScore)}`}>
+                <Flame className="w-3.5 h-3.5 fill-current" />
+                <span className="text-xs font-bold leading-none">{activeAnalysis.viralScore}%</span>
               </div>
             </div>
 
-            {/* Timestamps */}
-            <div className="bg-slate-900 rounded-xl p-3 flex items-center justify-between border border-slate-800/60 text-xs font-mono">
-              <div className="space-y-1">
-                <span className="text-[9px] text-slate-500 uppercase">Mulai Klip</span>
-                <div className="text-slate-300 flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-indigo-400" />
+            {/* Timestamps info block */}
+            <div className="bg-slate-900 rounded-lg p-2.5 flex items-center justify-between border border-slate-800/60 text-[11px] font-mono">
+              <div className="space-y-0.5">
+                <span className="text-[8px] text-slate-500 uppercase">Mulai</span>
+                <div className="text-slate-300 flex items-center gap-1 font-semibold">
+                  <Clock className="w-3 h-3 text-indigo-400" />
                   <span>{activeAnalysis.recommendedStart}s</span>
                 </div>
               </div>
-              <ArrowRight className="w-4 h-4 text-slate-600" />
-              <div className="space-y-1 text-right">
-                <span className="text-[9px] text-slate-500 uppercase">Selesai Klip</span>
-                <div className="text-slate-300 flex items-center gap-1 justify-end">
-                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+              <ArrowRight className="w-3 h-3 text-slate-600" />
+              <div className="space-y-0.5 text-right">
+                <span className="text-[8px] text-slate-500 uppercase">Selesai</span>
+                <div className="text-slate-300 flex items-center gap-1 justify-end font-semibold">
+                  <Clock className="w-3 h-3 text-amber-400" />
                   <span>{activeAnalysis.recommendedEnd}s</span>
                 </div>
               </div>
-              <div className="border-l border-slate-800 pl-3 space-y-1 text-right">
-                <span className="text-[9px] text-slate-500 uppercase">Durasi</span>
+              <div className="border-l border-slate-800 pl-2.5 text-right space-y-0.5">
+                <span className="text-[8px] text-slate-500 uppercase">Durasi</span>
                 <div className="font-bold text-indigo-400">
                   {(activeAnalysis.recommendedEnd - activeAnalysis.recommendedStart).toFixed(1)}s
                 </div>
@@ -339,55 +411,192 @@ export default function AIAssistant({
             </div>
 
             {/* Why Chosen */}
-            <div className="space-y-1.5 text-xs">
-              <h5 className="font-medium text-slate-300 flex items-center gap-1.5 text-[11px]">
-                <FileText className="w-3.5 h-3.5 text-indigo-400" />
-                Mengapa Adegan Ini Menarik?
-              </h5>
-              <p className="text-slate-400 leading-relaxed text-[11px] bg-slate-900/40 p-3 rounded-lg border border-slate-800/40">
+            <div className="space-y-1 text-[11px]">
+              <span className="font-semibold text-slate-300 flex items-center gap-1">
+                <FileText className="w-3 h-3 text-indigo-400" />
+                Mengapa adegan ini dipilih?
+              </span>
+              <p className="text-slate-400 leading-relaxed bg-slate-900/40 p-2.5 rounded-lg border border-slate-850 text-[10px]">
                 {activeAnalysis.reason}
               </p>
             </div>
-          </div>
 
-          {/* Social Caption suggestions */}
-          <div className="space-y-2">
-            <h5 className="font-medium text-slate-300 text-xs flex items-center gap-1.5">
-              <Flame className="w-3.5 h-3.5 text-amber-500" />
-              Saran Caption & Hashtag Viral (AI)
-            </h5>
-            <div className="bg-slate-950 border border-slate-850 rounded-xl p-4 text-[11px] font-mono text-slate-400 whitespace-pre-wrap relative group">
-              {activeAnalysis.suggestedCaption}
+            {/* Headline Actions */}
+            <div className="flex gap-2 pt-1.5 justify-end">
               <button
-                onClick={() => {
-                  navigator.clipboard.writeText(activeAnalysis.suggestedCaption);
-                  alert("Caption disalin ke clipboard!");
-                }}
-                className="absolute top-2 right-2 bg-slate-800 hover:bg-slate-700 hover:text-slate-200 border border-slate-750 px-2 py-1 rounded text-[9px] transition-all"
+                onClick={() => handleCopyCaption(activeAnalysis.suggestedCaption)}
+                className="py-1.5 px-3 bg-slate-800 hover:bg-slate-750 text-slate-300 rounded-lg text-[10px] font-semibold transition-all flex items-center gap-1"
+                title="Salin caption media sosial"
+                type="button"
               >
-                Copy
+                <Copy className="w-3.5 h-3.5" />
+                <span>Salin Caption</span>
+              </button>
+              <button
+                onClick={() => handleCreateThumbnailFromScene({
+                  start: activeAnalysis.recommendedStart,
+                  end: activeAnalysis.recommendedEnd,
+                  title: activeAnalysis.title,
+                  reason: activeAnalysis.reason,
+                  viralScore: activeAnalysis.viralScore,
+                  suggestedCaption: activeAnalysis.suggestedCaption,
+                  subtitles: activeAnalysis.subtitles
+                })}
+                className="py-1.5 px-3 bg-emerald-950/45 text-emerald-400 hover:bg-emerald-900 border border-emerald-500/10 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1"
+                title="Buat cover thumbnail untuk scene ini"
+                type="button"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>Buat Thumbnail</span>
+              </button>
+              <button
+                onClick={() => handleApplyScene({
+                  start: activeAnalysis.recommendedStart,
+                  end: activeAnalysis.recommendedEnd,
+                  title: activeAnalysis.title,
+                  reason: activeAnalysis.reason,
+                  viralScore: activeAnalysis.viralScore,
+                  suggestedCaption: activeAnalysis.suggestedCaption,
+                  subtitles: activeAnalysis.subtitles
+                })}
+                className="py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shadow-md"
+                type="button"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Terapkan Potongan</span>
               </button>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="grid grid-cols-2 gap-3 pt-2">
+          {/* List of Multiple Scenes (Best Scenes detected by AI) */}
+          {activeAnalysis.scenes && activeAnalysis.scenes.length > 0 && (
+            <div className="space-y-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <h5 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+                  Daftar Pilihan Adegan Terbaik Lainnya ({activeAnalysis.scenes.length})
+                </h5>
+              </div>
+              <p className="text-[9px] text-slate-500 leading-snug">
+                Pilih adegan di bawah untuk melakukan pratinjau instan di player, mengedit rentang waktu, atau membuat sampul thumbnail khusus.
+              </p>
+
+              {/* Grid / List of scenes */}
+              <div className="space-y-3">
+                {activeAnalysis.scenes.map((scene, idx) => (
+                  <div 
+                    key={scene.id || idx}
+                    className={`border rounded-xl p-3.5 transition-all space-y-2.5 ${
+                      selectedSceneId === scene.id
+                        ? "bg-indigo-950/20 border-indigo-500/40 shadow-md"
+                        : "bg-slate-950/40 border-slate-850 hover:bg-slate-900/60"
+                    }`}
+                    onClick={() => setSelectedSceneId(scene.id)}
+                  >
+                    {/* Scene Item Top Row */}
+                    <div className="flex items-start justify-between gap-1.5">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[8px] font-bold px-1.5 py-0.5 bg-slate-850 border border-slate-800 text-slate-300 rounded uppercase">
+                            Scene {idx + 1}
+                          </span>
+                          <span className="text-[9px] text-slate-500 font-mono flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-indigo-400" />
+                            {scene.start.toFixed(1)}s - {scene.end.toFixed(1)}s ({(scene.end - scene.start).toFixed(1)}s)
+                          </span>
+                        </div>
+                        <h6 className="font-bold text-slate-200 text-xs leading-tight">{scene.title}</h6>
+                      </div>
+
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/10">
+                        <Flame className="w-3 h-3 fill-current" />
+                        <span>{scene.viralScore}%</span>
+                      </div>
+                    </div>
+
+                    {/* Scene Explanation */}
+                    <p className="text-[10px] text-slate-400 leading-relaxed bg-slate-900/30 p-2 rounded border border-slate-900/60 font-sans">
+                      {scene.reason}
+                    </p>
+
+                    {/* Scene Action Bar */}
+                    <div className="flex gap-2 justify-end pt-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopyCaption(scene.suggestedCaption);
+                        }}
+                        className="p-1.5 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded border border-slate-800 text-[9px] font-semibold transition-all flex items-center gap-1"
+                        title="Salin caption scene ini"
+                        type="button"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>Caption</span>
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCreateThumbnailFromScene(scene);
+                        }}
+                        className="p-1.5 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-950/60 rounded border border-emerald-500/10 text-[9px] font-bold transition-all flex items-center gap-1"
+                        title="Buat Thumbnail Cover"
+                        type="button"
+                      >
+                        <Camera className="w-3 h-3" />
+                        <span>Thumbnail</span>
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleApplyScene(scene);
+                        }}
+                        className="py-1 px-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[9px] font-bold transition-all flex items-center gap-1 shadow"
+                        type="button"
+                      >
+                        <Play className="w-3 h-3 fill-current" />
+                        <span>Terapkan & Putar</span>
+                      </button>
+                    </div>
+
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Social Caption fallback display if scenes is somehow empty */}
+          {(!activeAnalysis.scenes || activeAnalysis.scenes.length === 0) && (
+            <div className="space-y-2">
+              <h5 className="font-semibold text-slate-300 text-xs flex items-center gap-1.5">
+                <Flame className="w-3.5 h-3.5 text-amber-500" />
+                Saran Caption & Hashtag Viral (AI)
+              </h5>
+              <div className="bg-slate-950 border border-slate-850 rounded-xl p-4 text-[11px] font-mono text-slate-400 whitespace-pre-wrap relative group">
+                {activeAnalysis.suggestedCaption}
+                <button
+                  onClick={() => handleCopyCaption(activeAnalysis.suggestedCaption)}
+                  className="absolute top-2 right-2 bg-slate-800 hover:bg-slate-700 hover:text-slate-200 border border-slate-750 px-2 py-1 rounded text-[9px] transition-all"
+                  type="button"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Reset / AI Controls */}
+          <div className="pt-2 flex justify-between gap-3">
             <button
               onClick={() => {
                 setActiveAnalysis(null);
                 setLogs([]);
               }}
-              className="py-3 px-4 bg-slate-800 hover:bg-slate-750 text-slate-300 rounded-xl font-medium text-xs transition-colors"
+              className="py-2.5 px-4 bg-slate-800 hover:bg-slate-750 text-slate-300 rounded-xl font-semibold text-xs transition-colors flex-1"
+              type="button"
             >
-              Reset AI
-            </button>
-            <button
-              onClick={() => onApplyHighlight(activeAnalysis.recommendedStart, activeAnalysis.recommendedEnd, activeAnalysis)}
-              className="py-3 px-4 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-medium text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-950/40 transition-transform hover:scale-[1.02] active:scale-[0.98]"
-              id="apply-ai-highlights-btn"
-            >
-              <Check className="w-4 h-4" />
-              <span>Terapkan Potongan</span>
+              Reset AI & Cari Lagi
             </button>
           </div>
         </div>

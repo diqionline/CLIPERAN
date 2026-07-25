@@ -93,15 +93,82 @@ async function startServer() {
           ];
         }
 
+        // Generate multiple mock scenes tailored to duration
+        const scene1Start = parseFloat(mockStart.toFixed(1));
+        const scene1End = parseFloat(mockEnd.toFixed(1));
+
+        const scene2Start = parseFloat((duration * 0.45).toFixed(1));
+        const scene2End = parseFloat(Math.min(duration, scene2Start + Math.min(18, duration * 0.3)).toFixed(1));
+
+        const scene3Start = parseFloat((duration * 0.72).toFixed(1));
+        const scene3End = parseFloat(Math.min(duration, scene3Start + Math.min(20, duration * 0.25)).toFixed(1));
+
+        const scene4Start = parseFloat((duration * 0.05).toFixed(1));
+        const scene4End = parseFloat(Math.min(duration, scene4Start + Math.min(15, duration * 0.15)).toFixed(1));
+
+        // Generate scene details
+        const mockScenes = [
+          {
+            id: "scene-1",
+            title: description ? `Sorotan Utama: ${description}` : `Momen Terpanas Kategori ${activeCategory}`,
+            start: scene1Start,
+            end: scene1End,
+            viralScore: 94,
+            reason: `Klip ini memiliki retensi visual tertinggi berdasarkan kategori "${activeCategory}". Sangat dinamis dan pas untuk langsung menarik audiens dalam 3 detik pertama.`,
+            suggestedCaption: `🔥 Bagian paling gokil kategori [${activeCategory}]! Gimana menurut kalian? 🤔👇\n\n#cliperan #fyp #viral #indonesia #highlight`,
+            subtitles: mockSubtitles
+          },
+          {
+            id: "scene-2",
+            title: `Adegan Transisi Kece - ${activeCategory}`,
+            start: scene2Start,
+            end: scene2End,
+            viralScore: 88,
+            reason: `Transisi visual di detik ${scene2Start}s s/d ${scene2End}s menunjukkan perkembangan plot atau aksi yang rapi dengan intensitas warna yang menonjol.`,
+            suggestedCaption: `⚡ Bagian kedua yang gak kalah estetik! Tag temen kalian yang suka scene kayak gini! ✨\n\n#cliperan #bestmoment #fyp #trend #editing`,
+            subtitles: [
+              { id: "scene2-sub-1", text: "Perhatiin transisi visualnya... Rapih banget! ⚡", start: parseFloat((scene2Start + 1).toFixed(1)), end: parseFloat((scene2Start + 4).toFixed(1)) },
+              { id: "scene2-sub-2", text: "Kombinasi komposisi warna terbaik! 🎨🎬", start: parseFloat((scene2Start + 5).toFixed(1)), end: parseFloat((scene2Start + 9).toFixed(1)) }
+            ]
+          },
+          {
+            id: "scene-3",
+            title: `Puncak Klimaks & Ending Dramatis`,
+            start: scene3Start,
+            end: scene3End,
+            viralScore: 82,
+            reason: `Momen klimaks di bagian akhir yang meninggalkan rasa penasaran tinggi (cliffhanger). Sempurna untuk memancing penonton menonton ulang.`,
+            suggestedCaption: `😱 Plot twist di bagian akhir bener-bener gak disangka! Tonton sampai habis ya guys! 🔥\n\n#viralindo #plottwist #cliperan #klimaks #shorts`,
+            subtitles: [
+              { id: "scene3-sub-1", text: "DI SINI BAGIAN YANG PALING SERU! 😱🔥", start: parseFloat((scene3Start + 1).toFixed(1)), end: parseFloat((scene3Start + 4).toFixed(1)) },
+              { id: "scene3-sub-2", text: "Duh, jadi penasaran kelanjutannya... 👇", start: parseFloat((scene3Start + 5).toFixed(1)), end: parseFloat((scene3Start + 8).toFixed(1)) }
+            ]
+          },
+          {
+            id: "scene-4",
+            title: `Hook Kilat Pembuka (Intro FYP)`,
+            start: scene4Start,
+            end: scene4End,
+            viralScore: 78,
+            reason: `Klip pendek berdurasi kilat yang langsung menyajikan aksi awal yang cepat (Fast-paced Action). Sangat ideal sebagai teaser singkat atau snap story.`,
+            suggestedCaption: `⚡ Teaser kilat penarik perhatian! Cuma butuh beberapa detik buat paham serunya! 😉\n\n#shorts #reel #teaser #videopendek #indonesia`,
+            subtitles: [
+              { id: "scene4-sub-1", text: "Awal adegan yang langsung bikin melotot! 👀", start: parseFloat((scene4Start + 1).toFixed(1)), end: parseFloat((scene4Start + 3).toFixed(1)) },
+              { id: "scene4-sub-2", text: "Siap-siap tonton versi lengkapnya ya! 🚀", start: parseFloat((scene4Start + 4).toFixed(1)), end: parseFloat((scene4Start + 7).toFixed(1)) }
+            ]
+          }
+        ];
+
         return res.json({
-          recommendedStart: parseFloat(mockStart.toFixed(1)),
-          recommendedEnd: parseFloat(mockEnd.toFixed(1)),
+          recommendedStart: scene1Start,
+          recommendedEnd: scene1End,
           title: description ? `Adegan: ${description}` : `${activeCategory} (Rekomendasi AI)`,
           reason: `Analisis AI berhasil mendeteksi segmen kategori "${activeCategory}" yang paling menonjol. Perpaduan gerakan dinamis, fokus adegan yang kuat, dan transisi dramatis di segmen ini sangat ideal untuk langsung menarik audiens media sosial dalam 3 detik pertama.`,
           viralScore: 94,
           suggestedCaption: `🔥 Momen terbaik kategori [${activeCategory}]! Bagian mana yang menurut kalian paling gokil? Komen di bawah! 👇\n\n#${catLower.replace(/\s+/g, "")} #videocut #cliperan #bestmoment #fyp #viral #indonesia`,
           subtitles: mockSubtitles,
           isMock: true,
+          scenes: mockScenes
         });
       }
 
@@ -110,7 +177,7 @@ async function startServer() {
       // Formulate the content parts for Gemini
       // Each frame is an object: { base64: string, timestamp: number }
       const promptText = `
-        Tugas Anda adalah menganalisis snapshot frame dari video berikut untuk mendeteksi adegan yang PALING MENCOCOKI kategori "${activeCategory}" untuk dijadikan klip pendek (maksimal 30 detik).
+        Tugas Anda adalah menganalisis snapshot frame dari video berikut untuk mendeteksi adegan-adegan yang PALING MENCOCOKI kategori "${activeCategory}" untuk dijadikan klip pendek (maksimal 30 detik).
         
         Kategori pencarian yang diminta pengguna: "${activeCategory}".
         Total durasi video asli adalah ${duration} detik.
@@ -119,21 +186,31 @@ async function startServer() {
         Berikut adalah beberapa frame kunci beserta timestamp-nya. Analisis perubahan visual, pergerakan, emosi wajah, atau fokus objek:
         ${frames.map((f: any, idx: number) => `Frame ${idx + 1}: Timestamp ${f.timestamp}s`).join("\n")}
 
-        Silakan tentukan interval waktu (mulai dan selesai) terbaik yang berdurasi MAKSIMAL 30 detik untuk dipotong sebagai klip media sosial (seperti TikTok, Reels, atau Shorts).
-        Selain itu, buatlah minimal 2 hingga 4 teks otomatis (subtitle) Bahasa Indonesia yang sangat serasi, lucu, ekspresif, atau dramatis yang cocok ditempatkan pada rentang waktu klip tersebut berdasarkan kategori "${activeCategory}".
+        Silakan tentukan interval waktu (mulai dan selesai) terbaik yang berdurasi MAKSIMAL 30 detik untuk dipotong sebagai klip media sosial utama (seperti TikTok, Reels, atau Shorts).
+        Selain itu, deteksi juga 3 hingga 4 segmen / adegan terbaik alternatif lainnya (scenes) dalam video ini yang memiliki skor potensi viral tinggi.
+        Untuk masing-masing adegan tersebut, buatlah minimal 2 hingga 4 teks otomatis (subtitle) Bahasa Indonesia yang sangat serasi, lucu, ekspresif, atau dramatis yang cocok ditempatkan pada rentang waktu adegan tersebut berdasarkan kategori "${activeCategory}".
 
         Berikan keluaran dalam format JSON terstruktur yang berisi:
-        1. recommendedStart: angka detik mulai klip (harus berada di antara 0 dan ${duration})
-        2. recommendedEnd: angka detik selesai klip (harus lebih besar dari recommendedStart, durasi maksimal 30 detik)
-        3. title: Judul singkat adegan menarik tersebut (dalam Bahasa Indonesia)
+        1. recommendedStart: angka detik mulai klip utama (harus berada di antara 0 dan ${duration})
+        2. recommendedEnd: angka detik selesai klip utama (harus lebih besar dari recommendedStart, durasi maksimal 30 detik)
+        3. title: Judul singkat adegan menarik utama tersebut (dalam Bahasa Indonesia)
         4. reason: Penjelasan mendalam mengapa adegan ini menarik secara visual untuk media sosial berdasarkan kategori "${activeCategory}" (dalam Bahasa Indonesia)
         5. viralScore: Angka perkiraan potensi viral dari 0 sampai 100
-        6. suggestedCaption: Rekomendasi caption viral yang menarik beserta hashtag relevan untuk postingan media sosial (dalam Bahasa Indonesia)
-        7. subtitles: Array berisi teks otomatis (subtitle) yang ditempelkan di atas video. Setiap subtitle harus memiliki:
+        6. suggestedCaption: Rekomendasi caption viral yang menarik beserta hashtag relevan untuk postingan media sosial utama (dalam Bahasa Indonesia)
+        7. subtitles: Array berisi teks otomatis (subtitle) yang ditempelkan di atas video untuk klip utama. Setiap subtitle harus memiliki:
            - id: string unik (misal "sub-1", "sub-2")
            - text: kalimat teks pendek, ekspresif, gaul, trendi, dan sarat emoji sesuai kategori "${activeCategory}" (maksimal 8 kata per subtitle)
            - start: detik kapan teks mulai muncul (harus berada di antara recommendedStart dan recommendedEnd)
            - end: detik kapan teks selesai muncul (harus lebih besar dari start dan kurang dari atau sama dengan recommendedEnd)
+        8. scenes: Array berisi 3 hingga 4 adegan menarik lainnya yang ditemukan (candidate scenes). Setiap adegan harus memiliki:
+           - id: string unik (misal "scene-1", "scene-2", dll.)
+           - title: judul singkat adegan menarik tersebut (dalam Bahasa Indonesia)
+           - start: detik mulai adegan (antara 0 dan ${duration})
+           - end: detik selesai adegan (lebih besar dari start, durasi maksimal 30 detik)
+           - viralScore: perkiraan potensi viral (0 - 100)
+           - reason: alasan mengapa segmen adegan ini menarik (dalam Bahasa Indonesia)
+           - suggestedCaption: saran caption viral dengan hashtag relevan (dalam Bahasa Indonesia)
+           - subtitles: array berisi teks otomatis (subtitle) khusus untuk adegan ini, masing-masing memiliki id, text, start, dan end.
       `;
 
       // Build the parts array: first the prompt, then each image
@@ -199,8 +276,39 @@ async function startServer() {
                   required: ["id", "text", "start", "end"],
                 },
               },
+              scenes: {
+                type: Type.ARRAY,
+                description: "List of other interesting candidate scenes detected in the video.",
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id: { type: Type.STRING },
+                    title: { type: Type.STRING, description: "Scene title in Indonesian." },
+                    start: { type: Type.NUMBER, description: "Start time of scene in seconds." },
+                    end: { type: Type.NUMBER, description: "End time of scene in seconds (max 30s duration)." },
+                    viralScore: { type: Type.NUMBER, description: "Estimated virality rating from 0 to 100." },
+                    reason: { type: Type.STRING, description: "Short explanation in Indonesian why this scene is appealing." },
+                    suggestedCaption: { type: Type.STRING, description: "Short caption with hashtags for this scene." },
+                    subtitles: {
+                      type: Type.ARRAY,
+                      description: "Subtitles specifically for this scene.",
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          id: { type: Type.STRING },
+                          text: { type: Type.STRING },
+                          start: { type: Type.NUMBER },
+                          end: { type: Type.NUMBER },
+                        },
+                        required: ["id", "text", "start", "end"],
+                      }
+                    }
+                  },
+                  required: ["id", "title", "start", "end", "viralScore", "reason", "suggestedCaption", "subtitles"]
+                }
+              }
             },
-            required: ["recommendedStart", "recommendedEnd", "title", "reason", "viralScore", "suggestedCaption", "subtitles"],
+            required: ["recommendedStart", "recommendedEnd", "title", "reason", "viralScore", "suggestedCaption", "subtitles", "scenes"],
           },
         },
       });

@@ -21,6 +21,17 @@ export interface SubtitleItem {
   style?: string; // e.g. "tiktok-yellow", "classic-white", "neon-green"
 }
 
+export interface AIScene {
+  id: string;
+  title: string;
+  start: number;
+  end: number;
+  viralScore: number;
+  reason: string;
+  suggestedCaption: string;
+  subtitles?: SubtitleItem[];
+}
+
 export interface AIAnalysis {
   recommendedStart: number;
   recommendedEnd: number;
@@ -30,6 +41,7 @@ export interface AIAnalysis {
   suggestedCaption: string;
   subtitles?: SubtitleItem[];
   isMock: boolean;
+  scenes?: AIScene[];
 }
 
 export type SocialPlatform = "tiktok" | "instagram" | "youtube";
